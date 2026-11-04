@@ -3,7 +3,7 @@
  *  1. 每位人物走自己的理想路径 → 成为第一名且匹配度恰为 99.99
  *  2. 任意两位人物的理想路径互不相同（至少差 MIN_GAP 题）
  *  3. 穷举全部 4^10 组答案：MATCH_FLOOR 与穷举最低值一致；每个人物都能成为第一名；第一名占比不被少数人垄断
- *  4. 2000+ 组确定性随机答案用真实 calculateResult：匹配度落在 0.01–99.99、跨越多个十分位档、非理想路径不出现 99.99
+ *  4. 2000+ 组确定性随机答案用真实 calculateResult：匹配度落在 70–99.99、分布铺开、非理想路径不出现 99.99
  * 任一项不通过则 exit 1。运行：node scripts/verify-reachability.mjs
  */
 import { loadTs, MIN_GAP } from './lib/quiz-model.mjs'
@@ -123,20 +123,18 @@ for (let i = 0; i < RUNS; i++) {
   pcts.push(r.matchPercent)
   sampleCount[r.primary.id] = (sampleCount[r.primary.id] ?? 0) + 1
   const isIdeal = IDEAL_PATHS[r.primary.id] === p
-  check(r.matchPercent >= 0.01 && r.matchPercent <= 99.99, `越界 ${p} → ${r.matchPercent}`)
+  check(r.matchPercent >= 70 && r.matchPercent <= 99.99, `越界 ${p} → ${r.matchPercent}`)
   check(isIdeal === (r.matchPercent === 99.99), `${p} 非理想路径却得 99.99（或反之）`)
   check(Math.round(r.matchPercent * 100) === r.matchPercent * 100 || Number(r.matchPercent.toFixed(2)) === r.matchPercent, `${p} 非两位小数`)
 }
-for (const p of pcts) hist[Math.min(9, Math.floor(((p - 0.01) / 99.98) * 10))]++
+for (const p of pcts) hist[Math.min(9, Math.floor(((p - 70) / 29.99) * 10))]++
 const min = Math.min(...pcts), max = Math.max(...pcts)
 const mean = pcts.reduce((a, b) => a + b, 0) / RUNS
 const sampleMax = Math.max(...Object.values(sampleCount))
-check(min < 10, `随机匹配度最低值 ${min} 未触及低段（应 <10）`)
-check(max > 70, `随机匹配度最高值 ${max} 未触及高段（应 >70）`)
-check(hist.filter((c) => c > 0).length >= 7, `随机匹配度仅覆盖 ${hist.filter((c) => c > 0).length}/10 档（应 ≥7）`)
+check(max - min > 15, `随机匹配度分布过窄 ${min}–${max}`)
 check(Math.max(...hist) / RUNS < 0.5, '随机匹配度过度集中在单一区间')
-// 极端：最差组合应映射到 0.01
-check(agreementToPercent(MATCH_FLOOR) === 0.01, '最低贴合度未映射到 0.01')
+// 极端：最差组合应映射到 70.00
+check(agreementToPercent(MATCH_FLOOR) === 70, '最低贴合度未映射到 70.00')
 
 console.log('\n=== 汇总 ===')
 console.log(`理想路径 → 本人第一且 99.99：${reach999}/${NF}`)
@@ -144,10 +142,10 @@ console.log(`理想路径两两最少相差 ${minGap} 题`)
 console.log(`穷举 ${totalCombos} 组：可成为第一的人物 ${reachable}/${NF}；其中贴合度并列、靠特质余弦决胜的组合 ${tieCount.n}；第一名最大占比 ${(maxShare * 100).toFixed(2)}%（${maxId}）；最小占比 ${(Math.min(...primaryCount) / totalCombos * 100).toFixed(3)}%`)
 console.log(`穷举最低第一名贴合度 = ${floor}（score.ts MATCH_FLOOR = ${MATCH_FLOOR}）`)
 console.log(`随机 ${RUNS} 次（真实 calculateResult）：min ${min.toFixed(2)} max ${max.toFixed(2)} mean ${mean.toFixed(2)}；出现过的第一名 ${Object.keys(sampleCount).length}/${NF}；最大占比 ${(sampleMax / RUNS * 100).toFixed(2)}%`)
-console.log('匹配度 10 档直方图（0.01→99.99）：')
+console.log('匹配度 10 档直方图（70→99.99）：')
 hist.forEach((c, i) => {
-  const lo = 0.01 + i * 9.998
-  console.log(`  ${lo.toFixed(2)}–${(lo + 9.998).toFixed(2)}  ${String(c).padStart(5)}  ${'#'.repeat(Math.round((c / RUNS) * 100))}`)
+  const lo = 70 + i * 2.999
+  console.log(`  ${lo.toFixed(2)}–${(lo + 2.999).toFixed(2)}  ${String(c).padStart(5)}  ${'#'.repeat(Math.round((c / RUNS) * 100))}`)
 })
 if (failures.length) {
   console.error(`\n✗ ${failures.length} 项未通过：`)
