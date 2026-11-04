@@ -63,7 +63,7 @@ export default function App() {
           <QuizScreen step={step} answers={answers} onAnswer={handleAnswer} onBack={handleBack} />
         ) : null}
         {phase === 'result' && result ? (
-          <ResultScreen result={result} backgroundUrl={backgroundUrl} onRetake={resetAll} />
+          <ResultScreen result={result} onRetake={resetAll} />
         ) : null}
       </main>
     </div>

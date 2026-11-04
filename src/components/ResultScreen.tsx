@@ -7,7 +7,6 @@ import { SaveImageSheet } from './SaveImageSheet'
 
 type ResultScreenProps = {
   result: QuizResult
-  backgroundUrl: string
   onRetake: () => void
 }
 
@@ -48,10 +47,8 @@ async function renderNodePng(node: HTMLElement, backgroundColor: string): Promis
   })
 }
 
-export function ResultScreen({ result, backgroundUrl, onRetake }: ResultScreenProps) {
+export function ResultScreen({ result, onRetake }: ResultScreenProps) {
   const cardRef = useRef<HTMLElement>(null)
-  const quoteExportRef = useRef<HTMLDivElement>(null)
-  const nameExportRef = useRef<HTMLDivElement>(null)
   const [exporting, setExporting] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [previewImages, setPreviewImages] = useState<{ url: string; label: string }[] | null>(null)
@@ -86,43 +83,31 @@ export function ResultScreen({ result, backgroundUrl, onRetake }: ResultScreenPr
     window.setTimeout(() => setToast(null), 2200)
   }
 
-  async function renderThreeShots(): Promise<SaveImageItem[]> {
-    if (!quoteExportRef.current || !nameExportRef.current || !cardRef.current) {
-      throw new Error('export nodes missing')
+  /** 只导出结果卡片一张图 */
+  async function renderCardShot(): Promise<SaveImageItem[]> {
+    if (!cardRef.current) {
+      throw new Error('export node missing')
     }
 
-    const [quoteUrl, nameUrl, cardUrl] = await Promise.all([
-      renderNodePng(quoteExportRef.current, '#0a0a0a'),
-      renderNodePng(nameExportRef.current, '#0a0a0a'),
-      renderNodePng(cardRef.current, '#e8d7b5'),
-    ])
-
-    return [
-      { dataUrl: quoteUrl, filename: `${primary.name}-名言.png` },
-      { dataUrl: nameUrl, filename: `${primary.name}-你像谁.png` },
-      { dataUrl: cardUrl, filename: `我最像${primary.name}.png` },
-    ]
+    const cardUrl = await renderNodePng(cardRef.current, '#e8d7b5')
+    return [{ dataUrl: cardUrl, filename: `我最像${primary.name}.png` }]
   }
 
   async function handleSaveToAlbum() {
     if (exporting) return
     setExporting(true)
     try {
-      const items = await renderThreeShots()
+      const items = await renderCardShot()
       setSavedItems(items)
       const outcome = await saveImagesToAlbum(items)
       if (outcome === 'shared') {
-        showToast('已打开系统分享，可一次保存三张图')
+        showToast('已打开系统分享，可保存到相册')
       } else if (outcome === 'downloaded') {
-        showToast('已下载三张结果图')
+        showToast('已下载结果卡片')
       } else if (outcome === 'cancelled') {
         showToast('已取消保存')
       } else {
-        setPreviewImages([
-          { url: items[0].dataUrl, label: '1 · 背景 + 名言' },
-          { url: items[1].dataUrl, label: '2 · 背景 + 你像谁' },
-          { url: items[2].dataUrl, label: '3 · 结果卡片' },
-        ])
+        setPreviewImages([{ url: items[0].dataUrl, label: '结果卡片' }])
         if (outcome === 'failed') {
           showToast('请长按图片保存到相册')
         }
@@ -144,7 +129,7 @@ export function ResultScreen({ result, backgroundUrl, onRetake }: ResultScreenPr
       } else if (outcome === 'cancelled') {
         showToast('已取消')
       } else if (outcome === 'downloaded') {
-        showToast('已下载三张结果图')
+        showToast('已下载结果卡片')
       }
     } finally {
       setExporting(false)
@@ -268,7 +253,7 @@ export function ResultScreen({ result, backgroundUrl, onRetake }: ResultScreenPr
 
           <div className="action-dock">
             <button type="button" className="primary-btn" onClick={handleSaveToAlbum} disabled={exporting}>
-              {exporting ? '生成三张图…' : '保存到相册'}
+              {exporting ? '生成图片…' : '保存到相册'}
             </button>
             <div className="action-grid">
               <button type="button" className="ghost-btn on-dark" onClick={handleCopyShareLine}>
@@ -281,39 +266,6 @@ export function ResultScreen({ result, backgroundUrl, onRetake }: ResultScreenPr
           </div>
         </div>
       ) : null}
-
-      {/* 离屏导出：背景+名言 / 背景+你像谁 */}
-      <div className="export-stage" aria-hidden>
-        <div ref={quoteExportRef} className="export-shot">
-          <img className="export-shot-bg" src={backgroundUrl} alt="" />
-          <div className="export-shot-mask" />
-          <div className="export-shot-body">
-            <p className="quote-reveal-mark">昔人有言</p>
-            <div className="quote-reveal-columns">
-              {quoteColumns.map((column, columnIndex) => (
-                <p key={`export-q-${columnIndex}`} className="quote-reveal-vertical">
-                  {Array.from(column).map((char, charIndex) => (
-                    <span key={`export-q-${columnIndex}-${charIndex}`} className="quote-char is-static">
-                      {char}
-                    </span>
-                  ))}
-                </p>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div ref={nameExportRef} className="export-shot">
-          <img className="export-shot-bg" src={backgroundUrl} alt="" />
-          <div className="export-shot-mask" />
-          <div className="export-shot-body">
-            <p className="name-reveal-kicker">你最像</p>
-            <h2 className="name-reveal-title">{primary.name}</h2>
-            <p className="name-reveal-sub">{primary.era}</p>
-            <span className="name-reveal-seal">悟</span>
-          </div>
-        </div>
-      </div>
 
       {toast ? <div className="toast-pill">{toast}</div> : null}
 

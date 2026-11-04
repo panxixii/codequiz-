@@ -73,7 +73,7 @@ input {
     max(1.25rem, calc(var(--safe-bottom) + 0.75rem))
     max(0.95rem, var(--safe-left));
   overflow: hidden;
-  background: #1a1510;
+  background: #000;
 }
 
 /* 随机国画背景 */
@@ -96,10 +96,53 @@ input {
   z-index: 0;
 }
 
+.app-shell::before,
+.app-shell::after {
+  transition: opacity 0.6s ease;
+}
+
+/* 名言揭晓阶段：PC 与移动端都是纯黑底，背景图、动画和蒙版一起隐藏；
+   名言浮层卸载（进入人物名揭晓）后再淡入 */
+.app-shell:has(.quote-reveal)::before,
+.app-shell:has(.quote-reveal)::after {
+  opacity: 0;
+}
+
 .app-frame {
   position: relative;
   z-index: 1;
   width: min(100%, 420px);
+}
+
+/* 网页版：卡片在视口内垂直居中；用 auto 外边距而非 justify-content，
+   内容高于视口时（如结果页）从顶部开始排，不会被裁掉 */
+@media (min-width: 768px) {
+  .app-frame {
+    margin-block: auto;
+  }
+
+  /* PC 背景：竖长卷顺时针转 90° 横铺满屏，并循环缓慢向左滑动；卡片不动。图未加载时为黑底。
+     伪元素先做成「竖屏」尺寸（宽 = 视口高，高 = 视口宽），旋转后正好盖满横屏。
+     旋转后元素自身的 Y 轴朝向屏幕左方，所以让背景沿 Y 方向移动一整张图的长度 = 向左无缝循环 */
+  .app-shell::before {
+    /* 长卷高宽比（高 ÷ 宽），用于算出一整张图铺开的长度 */
+    --pc-bg-ratio: calc(1024 / 145);
+    --pc-bg-tile: calc(100vh * var(--pc-bg-ratio));
+    inset: auto;
+    top: 50%;
+    left: 50%;
+    width: 30%;
+    height: 100vw;
+    transform: translate(-50%, -50%) rotate(270deg);
+    background: url('/art/bg/pc.jpg') 0 0 / 100% var(--pc-bg-tile) repeat-y, #000;
+    animation: pc-bg-drift 240s linear infinite;
+    will-change: background-position;
+  }
+
+  /* 轻蒙版，让卡片从画面中浮出来 */
+  .app-shell::after {
+    background: rgba(0, 0, 0, 0.3);
+  }
 }
 
 .scroll-panel {
@@ -149,6 +192,23 @@ input {
 .scroll-panel > * {
   position: relative;
   z-index: 1;
+}
+
+/* PC 卡片：必须写在 .scroll-panel 基础样式之后，否则同优先级会被覆盖 */
+@media (min-width: 768px) {
+  /* 纸色压深，贴近长卷绢黄（蒙版后约 #8d7649）的色调；边框、阴影同步加深 */
+  .scroll-panel {
+    background: linear-gradient(180deg, rgba(214, 190, 142, 0.98) 0%, rgba(190, 160, 108, 0.98) 100%);
+    border-color: rgba(120, 92, 52, 0.7);
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.45),
+      0 22px 48px rgba(0, 0, 0, 0.45);
+  }
+
+  /* 卡片上的花换成 pc-card */
+  .scroll-panel::after {
+    background-image: url('/art/pc-card.webp');
+  }
 }
 
 .brand-row {
@@ -952,7 +1012,18 @@ input {
   }
 }
 
+/* PC 背景长卷：移动一整张图的长度后回到起点，repeat-y 让首尾相接，形成无缝循环 */
+@keyframes pc-bg-drift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 var(--pc-bg-tile);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .app-shell::before,
   .rise-in,
   .quote-reveal.is-out,
   .name-reveal.is-in,

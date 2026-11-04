@@ -13,7 +13,7 @@ export function SaveImageSheet({ images, onClose, onRetryShare }: SaveImageSheet
           <div>
             <h3 className="font-display text-xl text-[#1f170f]">保存到相册</h3>
             <p className="mt-1 text-sm leading-relaxed text-[#5a4a36]">
-              共 {images.length} 张。若未自动保存，请<strong>长按下方图片</strong>，选择「存储图像 /
+              {images.length > 1 ? `共 ${images.length} 张。` : ''}若未自动保存，请<strong>长按下方图片</strong>，选择「存储图像 /
               保存到照片」。
             </p>
           </div>
