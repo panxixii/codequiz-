@@ -224,7 +224,7 @@ function adminPage(): string {
       padding: 24px 16px 48px;
     }
     .card {
-      width: min(720px, 100%);
+      width: min(760px, 100%);
       background: linear-gradient(180deg, #ece0ba, #dcc294);
       border: 1px solid rgba(168,136,88,.65);
       border-radius: 6px; padding: 22px 20px 24px;
@@ -245,8 +245,29 @@ function adminPage(): string {
       color:#f8e7d2; border-color: rgba(143,28,20,.8); letter-spacing:.12em;
     }
     button.secondary { background: rgba(255,248,235,.45); color:#5c4a32; }
-    .msg { min-height: 1.3em; margin: 12px 0; color:#8f1c14; font-size:.9rem; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .msg { min-height: 1.3em; margin: 12px 0 0; color:#8f1c14; font-size:.9rem; }
     .msg.ok { color:#2f6b3a; }
+    .toast {
+      position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(16px);
+      background: rgba(12,12,12,.92); color: #f4e7c8; border: 1px solid rgba(196,165,116,.45);
+      padding: 12px 18px; border-radius: 6px; opacity: 0; pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease; z-index: 20; max-width: min(90vw, 420px);
+      text-align: center; font-size: .92rem; letter-spacing: .04em;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.ok { border-color: rgba(90,160,110,.55); }
+    .toast.err { border-color: rgba(196,80,70,.65); }
+    .stats {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+      margin: 16px 0 8px;
+    }
+    .stat {
+      background: rgba(255,248,235,.45); border: 1px solid rgba(90,70,42,.16);
+      border-radius: 4px; padding: 10px 8px; text-align: center;
+    }
+    .stat .n { font-size: 1.35rem; line-height: 1.2; color: #8f1c14; letter-spacing: .04em; }
+    .stat .l { margin-top: 4px; color: #6b5840; font-size: .72rem; letter-spacing: .08em; }
     table { width:100%; border-collapse: collapse; margin-top: 8px; font-size:.9rem; }
     th, td { text-align:left; padding: 8px 6px; border-bottom: 1px solid rgba(90,70,42,.16); }
     th { color:#6b5840; font-weight:600; }
@@ -256,10 +277,18 @@ function adminPage(): string {
       background: rgba(180,35,24,.1); color:#8f1c14;
     }
     .pill.ok { background: rgba(47,107,58,.12); color:#2f6b3a; }
+    .created-box {
+      margin-top: 12px; padding: 10px 12px; border-radius: 4px;
+      background: rgba(255,248,235,.55); border: 1px dashed rgba(90,70,42,.28);
+      display: none;
+    }
+    .created-box.show { display: block; }
     .login-only, .app-only { display:none; }
     body.is-login .login-only { display:block; }
     body.is-app .app-only { display:block; }
-    @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+    @media (max-width: 640px) {
+      .row, .stats { grid-template-columns: 1fr 1fr; }
+    }
   </style>
 </head>
 <body class="is-login">
@@ -276,6 +305,13 @@ function adminPage(): string {
     </div>
 
     <div class="app-only">
+      <div class="stats" id="stats">
+        <div class="stat"><div class="n" id="s-codes">0</div><div class="l">兑换码总数</div></div>
+        <div class="stat"><div class="n" id="s-capacity">0</div><div class="l">总可用次数</div></div>
+        <div class="stat"><div class="n" id="s-used">0</div><div class="l">已使用次数</div></div>
+        <div class="stat"><div class="n" id="s-left">0</div><div class="l">剩余次数</div></div>
+      </div>
+
       <div class="row">
         <div>
           <label>每个码可用次数</label>
@@ -302,7 +338,7 @@ function adminPage(): string {
         <button id="btn-refresh" class="secondary" type="button">刷新列表</button>
         <button id="btn-logout" class="secondary" type="button">退出</button>
       </div>
-      <div id="created" class="msg"></div>
+      <div id="created" class="created-box"></div>
       <table>
         <thead>
           <tr><th>兑换码</th><th>已用/上限</th><th>剩余</th><th>来源</th></tr>
@@ -312,10 +348,12 @@ function adminPage(): string {
     </div>
     <div id="msg" class="msg"></div>
   </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script>
     const $ = (id) => document.getElementById(id)
     const tokenKey = 'codequiz.admin.token'
     let token = localStorage.getItem(tokenKey) || ''
+    let toastTimer = null
 
     function setMsg(text, ok=false) {
       const el = $('msg')
@@ -323,8 +361,22 @@ function adminPage(): string {
       el.className = 'msg' + (ok ? ' ok' : '')
     }
 
+    function toast(text, ok=true) {
+      const el = $('toast')
+      el.textContent = text
+      el.className = 'toast show ' + (ok ? 'ok' : 'err')
+      clearTimeout(toastTimer)
+      toastTimer = setTimeout(() => { el.className = 'toast' }, 2200)
+    }
+
     function showApp(on) {
       document.body.className = on ? 'is-app' : 'is-login'
+    }
+
+    function setBusy(btn, busy, busyText) {
+      if (!btn.dataset.label) btn.dataset.label = btn.textContent
+      btn.disabled = !!busy
+      btn.textContent = busy ? busyText : btn.dataset.label
     }
 
     async function api(path, body) {
@@ -343,11 +395,23 @@ function adminPage(): string {
       return data
     }
 
+    function renderStats(items) {
+      const totalCodes = items.length
+      const capacity = items.reduce((s, i) => s + (i.limit || 0), 0)
+      const used = items.reduce((s, i) => s + (i.used || 0), 0)
+      const left = items.reduce((s, i) => s + (i.remaining || 0), 0)
+      $('s-codes').textContent = String(totalCodes)
+      $('s-capacity').textContent = String(capacity)
+      $('s-used').textContent = String(used)
+      $('s-left').textContent = String(left)
+    }
+
     async function refresh() {
       const data = await api('/admin/list', {})
-      const rows = (data.items || []).map((item) => {
-        const left = item.remaining
-        const pill = left > 0
+      const items = data.items || []
+      renderStats(items)
+      const rows = items.map((item) => {
+        const pill = item.remaining > 0
           ? '<span class="pill ok">可用</span>'
           : '<span class="pill">已用完</span>'
         return '<tr>' +
@@ -363,38 +427,54 @@ function adminPage(): string {
     $('btn-login').onclick = async () => {
       token = $('token').value.trim()
       if (!token) return setMsg('请输入管理密钥')
+      setBusy($('btn-login'), true, '登录中…')
       try {
         await api('/admin/list', {})
         localStorage.setItem(tokenKey, token)
         showApp(true)
-        setMsg('已登录', true)
+        setMsg('')
+        toast('登录成功', true)
         await refresh()
       } catch (e) {
         setMsg(e.message || '登录失败')
+        toast(e.message || '登录失败', false)
+      } finally {
+        setBusy($('btn-login'), false)
       }
     }
 
     $('btn-gen').onclick = async () => {
+      setBusy($('btn-gen'), true, '生成中…')
       try {
         const limit = Number($('limit').value)
         const count = Number($('count').value)
         const data = await api('/admin/generate', { limit, count })
         const codes = data.codes || []
-        $('created').className = 'msg ok'
-        $('created').innerHTML = '已生成：<br><code>' + codes.join('</code><br><code>') + '</code>'
-        setMsg('生成成功，可复制发给用户', true)
+        const box = $('created')
+        box.className = 'created-box show'
+        box.innerHTML = '<div style="margin-bottom:6px;color:#2f6b3a;">已生成 ' + codes.length + ' 个（每个可用 ' + limit + ' 次）</div><code>' + codes.join('</code><br><code>') + '</code>'
+        setMsg('')
+        toast('生成成功，可复制发给用户', true)
         await refresh()
       } catch (e) {
         setMsg(e.message || '生成失败')
+        toast(e.message || '生成失败', false)
+      } finally {
+        setBusy($('btn-gen'), false)
       }
     }
 
     $('btn-refresh').onclick = async () => {
+      setBusy($('btn-refresh'), true, '刷新中…')
       try {
         await refresh()
-        setMsg('列表已刷新', true)
+        setMsg('')
+        toast('列表与汇总已刷新', true)
       } catch (e) {
         setMsg(e.message || '刷新失败')
+        toast(e.message || '刷新失败', false)
+      } finally {
+        setBusy($('btn-refresh'), false)
       }
     }
 
@@ -402,7 +482,8 @@ function adminPage(): string {
       localStorage.removeItem(tokenKey)
       token = ''
       showApp(false)
-      setMsg('已退出')
+      setMsg('')
+      toast('已退出', true)
     }
 
     if (token) {
