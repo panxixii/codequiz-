@@ -71,13 +71,16 @@ function figureAgreement(answers: AnswerMap, idealPath: string): number {
 export const MATCH_FLOOR = 0.4
 
 /**
- * 匹配度 70.00–99.99（两位小数）：按第一名贴合度在 [MATCH_FLOOR, 1] 上线性映射。
+ * 匹配度 70.00–99.99（两位小数）：按第一名贴合度在 [MATCH_FLOOR, 1] 上做上凸映射，
+ * 让高分段更饱满（中等贴合也能落在 85–95）。曲线单调递增，最差组合仍为 70.00。
  * 只有完全走对该人物的理想路径（贴合度 = 1）才是 99.99。
  */
+export const MATCH_CURVE = 0.5
+
 export function agreementToPercent(agreement: number): number {
   if (agreement >= 1 - 1e-9) return 99.99
   const t = Math.min(1, Math.max(0, (agreement - MATCH_FLOOR) / (1 - MATCH_FLOOR)))
-  const percent = Math.round((70 + 29.99 * t) * 100) / 100
+  const percent = Math.round((70 + 29.99 * Math.pow(t, MATCH_CURVE)) * 100) / 100
   return Math.min(99.98, Math.max(70, percent))
 }
 

@@ -214,16 +214,6 @@ export function ResultScreen({ result, backgroundUrl, onRetake }: ResultScreenPr
       {showCard ? (
         <div className="result-card-enter space-y-4">
           <section ref={cardRef} className="scroll-panel result-sheet">
-            <div className="brand-row">
-              <div className="brand-mark">
-                <span className="seal" aria-hidden>
-                  测
-                </span>
-                CODEQUIZ
-              </div>
-              <span className="stat-chip">历史镜像</span>
-            </div>
-
             <div className="result-hero">
               <p className="cover-ornament" aria-hidden>
                 ◆
@@ -233,15 +223,9 @@ export function ResultScreen({ result, backgroundUrl, onRetake }: ResultScreenPr
               <p className="result-hero-sub">
                 {primary.era} · {primary.title}
               </p>
-            </div>
-
-            <div className="result-match">
-              <div className="result-match-label">
-                <span>气质契合</span>
+              <div className="result-match-seal" aria-label={`气质契合 ${matchPercent}%`}>
+                <span className="result-match-seal-label">气质契合</span>
                 <span className="result-match-percent">{matchPercent}%</span>
-              </div>
-              <div className="result-match-track">
-                <div className="result-match-fill" style={{ width: `${matchPercent}%` }} />
               </div>
             </div>
 

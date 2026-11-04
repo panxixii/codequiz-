@@ -143,7 +143,7 @@ input {
 .result-sheet.scroll-panel::after {
   width: min(48%, 11rem);
   height: min(42%, 12rem);
-  opacity: 0.16;
+  opacity: 0.12;
 }
 
 .scroll-panel > * {
@@ -293,13 +293,51 @@ input {
   padding: 1.15rem 1.1rem 1.2rem;
 }
 
-.quiz-top {
+.quiz-progress {
+  flex: 0 0 auto;
+  margin-top: 0.95rem;
+}
+
+.quiz-progress .progress-track {
+  margin: 0 0 0.4rem;
+}
+
+.quiz-step {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex: 0 0 auto;
-  margin-bottom: 0.85rem;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+/* 无框的小箭头，返回上一题 */
+.step-back {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0 0.25rem;
+  margin: 0;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: #6b5840;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.2s ease;
+}
+
+.step-back:hover,
+.step-back:focus-visible {
+  color: #8f1c14;
+}
+
+.step-back:focus-visible {
+  outline: 1px solid rgba(143, 28, 20, 0.45);
+  outline-offset: 2px;
+}
+
+.step-back:disabled {
+  visibility: hidden;
 }
 
 .step-label {
@@ -320,19 +358,6 @@ input {
   height: 100%;
   background: linear-gradient(90deg, #8f1c14, #c4a574);
   transition: width 0.35s ease;
-}
-
-.nudge {
-  margin: 0 0 0.55rem;
-  min-height: 1.15rem;
-  color: var(--seal-deep);
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
-  flex: 0 0 auto;
-}
-
-.nudge.is-empty {
-  visibility: hidden;
 }
 
 .question-title {
@@ -368,7 +393,6 @@ input {
   align-items: center;
   text-align: left;
   border: none;
-  border-bottom: 1px solid rgba(90, 70, 42, 0.18);
   background: transparent;
   color: #2a2118;
   padding: 0.65rem 0.15rem;
@@ -377,14 +401,11 @@ input {
 }
 
 .option-btn.is-selected {
-  border-bottom-color: rgba(180, 35, 24, 0.45);
   color: #8f1c14;
 }
 
 .option-btn.is-selected .option-index {
-  border-color: rgba(180, 35, 24, 0.65);
-  background: rgba(180, 35, 24, 0.9);
-  color: #f8e7d2;
+  color: #8f1c14;
 }
 
 .option-btn > span:last-child {
@@ -398,95 +419,115 @@ input {
 }
 
 .option-index {
-  width: 1.35rem;
-  height: 1.35rem;
+  min-width: 1rem;
   display: inline-grid;
   place-items: center;
-  border: 1px solid rgba(90, 70, 42, 0.35);
+  border: none;
   background: transparent;
   font-family: var(--font-display);
-  font-size: 0.78rem;
+  font-size: 0.95rem;
   color: #6b5840;
   flex-shrink: 0;
 }
 
 /* 结果页：与开始页同系纸笺风格 */
 .result-sheet {
-  padding: 1.25rem 1.15rem 1.3rem;
+  --rc-gap: 0.85rem;
+  padding: 1.1rem 1.2rem 0.9rem;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 18px 40px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 4px rgba(236, 220, 186, 0),
+    inset 0 0 0 5px rgba(168, 136, 88, 0.35);
 }
 
 .result-hero {
-  margin-top: 1.35rem;
+  position: relative;
+  margin-top: 0;
+  padding-bottom: 0;
   text-align: center;
+}
+
+.result-hero .cover-ornament {
+  margin: 0 0 0.3rem;
 }
 
 .result-hero-name {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(2.35rem, 11vw, 3rem);
+  font-size: clamp(2.6rem, 13vw, 3.4rem);
   line-height: 1.18;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
+  padding-left: 0.16em;
   color: #1f170f;
+  text-shadow: 0 1px 0 rgba(255, 244, 220, 0.6);
+}
+
+.result-hero .cover-line {
+  width: 4.5rem;
+  margin: 0.4rem auto 0.4rem;
+  background: linear-gradient(90deg, transparent, var(--silk-deep), transparent);
 }
 
 .result-hero-sub {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
+  letter-spacing: 0.2em;
+  color: #6b5840;
+}
+
+.result-match-seal {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  margin: 0.6rem auto 0;
+  border: 2px solid var(--seal-deep);
+  border-radius: 6px;
+  color: var(--seal-deep);
+  background: rgba(180, 35, 24, 0.06);
+  box-shadow:
+    inset 0 0 0 2px rgba(236, 220, 186, 0.9),
+    inset 0 0 0 3px rgba(143, 28, 20, 0.55);
+  transform: rotate(-4deg);
+}
+
+.result-match-seal-label {
+  font-size: 0.6rem;
   letter-spacing: 0.18em;
-  color: #6b5840;
-}
-
-.result-match {
-  margin-top: 1.25rem;
-  padding: 0.85rem 0 0;
-  border-top: 1px solid rgba(90, 70, 42, 0.16);
-}
-
-.result-match-label {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
-  color: #6b5840;
-  font-size: 0.82rem;
-  letter-spacing: 0.14em;
+  padding-left: 0.18em;
+  opacity: 0.85;
 }
 
 .result-match-percent {
   font-family: var(--font-display);
-  font-size: 1.55rem;
-  line-height: 1;
+  font-size: 1.3rem;
+  line-height: 1.1;
+  margin-top: 0.1rem;
   color: var(--seal-deep);
-  letter-spacing: 0.04em;
-}
-
-.result-match-track {
-  margin-top: 0.55rem;
-  height: 3px;
-  background: rgba(90, 70, 42, 0.18);
-  overflow: hidden;
-}
-
-.result-match-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #8f1c14, #c4a574);
+  letter-spacing: 0.02em;
 }
 
 .result-tagline {
-  margin: 1.15rem 0 0;
+  margin: var(--rc-gap) 0 0;
+  padding: 0.55rem 0.4rem;
   text-align: center;
   font-family: var(--font-display);
-  font-size: 1.18rem;
-  line-height: 1.7;
+  font-size: 1.12rem;
+  line-height: 1.6;
   letter-spacing: 0.06em;
   color: #241a10;
+  border-top: 1px solid rgba(168, 136, 88, 0.45);
+  border-bottom: 1px solid rgba(168, 136, 88, 0.45);
 }
 
 .result-block {
-  margin-top: 1.15rem;
-  padding: 0.9rem 0.15rem 0.2rem;
-  border-top: 1px solid rgba(90, 70, 42, 0.14);
+  margin-top: var(--rc-gap);
+  padding: 0;
+  border-top: none;
 }
 
 .result-section-label {
@@ -494,7 +535,7 @@ input {
   align-items: center;
   justify-content: center;
   gap: 0.55rem;
-  margin: 0 0 0.7rem;
+  margin: 0 0 0.5rem;
   color: #6b5840;
   font-size: 0.78rem;
   letter-spacing: 0.22em;
@@ -506,75 +547,79 @@ input {
 
 .result-tags {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.45rem;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .result-tag {
+  padding: 0.3rem 0.8rem;
+  border: 1px solid rgba(143, 28, 20, 0.4);
+  border-radius: 999px;
+  background: rgba(255, 248, 230, 0.45);
   color: #5c4028;
   font-family: var(--font-display);
-  font-size: 0.98rem;
+  font-size: 0.95rem;
   letter-spacing: 0.1em;
-  line-height: 1.4;
-}
-
-.result-tag::before {
-  content: '※';
-  margin-right: 0.35rem;
-  color: var(--seal);
-  font-size: 0.72rem;
+  line-height: 1.35;
 }
 
 .result-advice {
-  margin: 1.05rem 0 0;
-  text-align: center;
-  color: #5a4a36;
+  margin: var(--rc-gap) 0 0;
+  padding: 0.6rem 0.95rem;
+  text-align: left;
+  color: #4a3b29;
   font-size: 0.9rem;
-  line-height: 1.75;
+  line-height: 1.7;
+  background: rgba(255, 248, 230, 0.35);
+  border-left: 3px solid var(--seal-deep);
+  border-radius: 0 3px 3px 0;
 }
 
 .result-also {
-  margin: 0.9rem 0 0;
-  padding-left: 0.75rem;
-  border-left: 2px solid rgba(180, 35, 24, 0.45);
-  color: #5a4a36;
-  font-size: 0.86rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  border: none;
+  text-align: center;
+  color: #6b5840;
+  font-size: 0.82rem;
   line-height: 1.55;
+  letter-spacing: 0.06em;
 }
 
 .result-encourage {
-  margin-top: 1.15rem;
-  padding-top: 0.95rem;
-  border-top: 1px solid rgba(90, 70, 42, 0.16);
+  margin-top: var(--rc-gap);
+  padding-top: 0.7rem;
+  border-top: 3px double rgba(168, 136, 88, 0.55);
   text-align: center;
 }
 
 .result-encourage-kicker {
   margin: 0;
-  color: #6b5840;
+  color: var(--seal-deep);
   font-size: 0.72rem;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.24em;
 }
 
 .result-encourage-text {
-  margin: 0.45rem 0 0;
+  margin: 0.4rem 0 0;
   font-family: var(--font-display);
-  font-size: 0.98rem;
-  line-height: 1.65;
+  font-size: 1rem;
+  line-height: 1.7;
   letter-spacing: 0.06em;
   color: #3a2a1c;
 }
 
 .result-foot {
-  margin: 1.1rem 0 0;
+  margin: 0.7rem 0 0;
   text-align: center;
-  font-size: 0.62rem;
-  letter-spacing: 0.2em;
-  color: rgba(90, 70, 42, 0.5);
+  font-size: 0.6rem;
+  letter-spacing: 0.22em;
+  color: rgba(90, 70, 42, 0.45);
 }
 
 /* 离屏导出画布 */

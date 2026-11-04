@@ -5,15 +5,6 @@ type StartScreenProps = {
 export function StartScreen({ onStart }: StartScreenProps) {
   return (
     <section className="scroll-panel cover-panel rise-in">
-      <div className="brand-row">
-        <div className="brand-mark">
-          <span className="seal" aria-hidden>
-            测
-          </span>
-          CODEQUIZ
-        </div>
-      </div>
-
       <div className="cover-body">
         <p className="cover-ornament" aria-hidden>
           ◆
