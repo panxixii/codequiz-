@@ -31,7 +31,7 @@ function parseValidCodes(env: Env): Set<string> {
   if (!raw) return new Set()
   return new Set(
     raw
-      .split(/[,\n]/)
+      .split(/[,，\s]+/)
       .map((item) => normalizeCode(item))
       .filter(Boolean),
   )

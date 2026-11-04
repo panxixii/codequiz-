@@ -27,7 +27,11 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      - name: Build
+        env:
+          # 在 GitHub → Settings → Secrets and variables → Actions 里添加同名密钥
+          VITE_REDEEM_API: ${{ secrets.VITE_REDEEM_API }}
+        run: pnpm build
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
