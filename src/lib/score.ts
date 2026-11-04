@@ -1,6 +1,8 @@
 import { FIGURE_LIST, type Figure, type FigureId } from '../data/figures'
 import { QUESTIONS } from '../data/questions'
+import { IDEAL_PATHS } from '../data/idealPaths'
 import {
+  TRAIT_IDS,
   addTraits,
   cosineSimilarity,
   emptyTraits,
@@ -24,77 +26,85 @@ const ENCOURAGEMENTS = [
   '测的是气质，不是命运。你依然可以成为更好的自己。',
 ]
 
+function optionTraits(questionIndex: number, optionId: string | undefined): TraitVector | null {
+  const option = QUESTIONS[questionIndex].options.find((item) => item.id === optionId)
+  return option ? addTraits(emptyTraits(), option.weights) : null
+}
+
 function buildUserTraits(answers: AnswerMap): TraitVector {
   let traits = emptyTraits()
-  for (const question of QUESTIONS) {
-    const optionId = answers[question.id]
-    const option = question.options.find((item) => item.id === optionId)
-    if (!option) continue
-    traits = addTraits(traits, option.weights)
-  }
+  QUESTIONS.forEach((question, qi) => {
+    const option = optionTraits(qi, answers[question.id])
+    if (option) traits = addTraits(traits, option)
+  })
   return traits
 }
 
-const clamp01 = (value: number) => Math.min(1, Math.max(0, value))
-
-/** 由答案生成稳定的 0–1 抖动，同一组答案结果恒定，不同答案略有差异 */
-function answerJitter(answers: AnswerMap): number {
-  let hash = 2166136261
-  for (const question of QUESTIONS) {
-    const text = `${question.id}:${answers[question.id] ?? ''};`
-    for (let i = 0; i < text.length; i++) {
-      hash = Math.imul(hash ^ text.charCodeAt(i), 16777619)
-    }
+/** 减去自身均值后的余弦：消除「特质全为正 → 余弦普遍偏高、偏爱平均型人物」的偏差 */
+function centeredCosine(a: TraitVector, b: TraitVector): number {
+  const center = (v: TraitVector) => {
+    const mean = TRAIT_IDS.reduce((sum, key) => sum + v[key], 0) / TRAIT_IDS.length
+    return addTraits(emptyTraits(), Object.fromEntries(TRAIT_IDS.map((k) => [k, v[k] - mean])))
   }
-  return ((hash >>> 0) % 1000) / 999
+  return cosineSimilarity(center(a), center(b))
 }
 
 /**
- * 匹配度：综合三项，经 logistic 曲线连续映射到 0.01–99.99（两位小数）。
- * - 绝对贴合：最高余弦相似度（特质均为正，余弦天然偏高，故用 0.93–0.995 区间拉开）
- * - 相对突出：最高分在全体人物分布中的 z 分数
- * - 领先优势：相对第二名的差距
- * 再叠加小幅答案确定性抖动。
+ * 题目贴合度：用户在第 q 题选的选项 与 人物理想选项 的特质余弦。
+ * 选得一样 = 1；不同但特质相近（如主/副特质重合）得部分分；毫不相干 = 0。
  */
-function computeMatchPercent(sortedScores: number[], answers: AnswerMap): number {
-  const [top, second = 0] = sortedScores
-  const mean = sortedScores.reduce((sum, v) => sum + v, 0) / sortedScores.length
-  const variance = sortedScores.reduce((sum, v) => sum + (v - mean) ** 2, 0) / sortedScores.length
-  const z = variance > 0 ? (top - mean) / Math.sqrt(variance) : 0
-
-  // fit / standout 不截断上限，让极端契合或极端不契合能进入曲线两端
-  const fit = (top - 0.93) / (0.995 - 0.93)
-  const standout = (z - 1.2) / (2.4 - 1.2)
-  const lead = clamp01((top - second) / 0.02)
-
-  const blended = fit * 0.5 + standout * 0.35 + lead * 0.15 + (answerJitter(answers) - 0.5) * 0.06
-  const logistic = 1 / (1 + Math.exp(-(blended - 0.45) * 12))
-  const percent = Math.round(logistic * 10000) / 100
-  return Math.min(99.99, Math.max(0.01, percent))
+function figureAgreement(answers: AnswerMap, idealPath: string): number {
+  let total = 0
+  QUESTIONS.forEach((question, qi) => {
+    const mine = optionTraits(qi, answers[question.id])
+    const ideal = optionTraits(qi, idealPath[qi])
+    if (!mine || !ideal) return
+    total += answers[question.id] === idealPath[qi] ? 1 : cosineSimilarity(mine, ideal)
+  })
+  return total / QUESTIONS.length
 }
 
-/** 特质向量余弦相似度匹配；接近时带出第二名「也很像」 */
+/**
+ * 任意一组答案下「第一名贴合度」的最低可能值（全部 4^10 组答案穷举得出）。
+ * 由 scripts/verify-reachability.mjs 计算并校验；人物或题目权重变动后需同步更新。
+ */
+export const MATCH_FLOOR = 0.4
+
+/**
+ * 匹配度 70.00–99.99（两位小数）：按第一名贴合度在 [MATCH_FLOOR, 1] 上线性映射。
+ * 只有完全走对该人物的理想路径（贴合度 = 1）才是 99.99。
+ */
+export function agreementToPercent(agreement: number): number {
+  if (agreement >= 1 - 1e-9) return 99.99
+  const t = Math.min(1, Math.max(0, (agreement - MATCH_FLOOR) / (1 - MATCH_FLOOR)))
+  const percent = Math.round((70 + 29.99 * t) * 100) / 100
+  return Math.min(99.98, Math.max(70, percent))
+}
+
+/**
+ * 每位人物 = 一条理想答题路径（其特质向量即该路径累加的特质）。
+ * 主排序：逐题贴合度均值；并列时按居中特质余弦、再按姓名决出。
+ */
 export function calculateResult(answers: AnswerMap): QuizResult {
   const userTraits = buildUserTraits(answers)
-
   const ranked = FIGURE_LIST.map((figure) => ({
     figure,
-    score: cosineSimilarity(userTraits, figure.traits),
-  })).sort((a, b) => b.score - a.score || a.figure.name.localeCompare(b.figure.name, 'zh'))
-
+    score: figureAgreement(answers, IDEAL_PATHS[figure.id]),
+    tie: centeredCosine(userTraits, figure.traits),
+  })).sort(
+    (a, b) =>
+      b.score - a.score || b.tie - a.tie || a.figure.name.localeCompare(b.figure.name, 'zh'),
+  )
   const top = ranked[0]
   const second = ranked[1]
   const scores = Object.fromEntries(
     ranked.map((item) => [item.figure.id, item.score]),
   ) as Record<FigureId, number>
 
-  const matchPercent = computeMatchPercent(
-    ranked.map((item) => item.score),
-    answers,
-  )
+  const matchPercent = agreementToPercent(top.score)
 
   const showSecondary =
-    second && top.score > 0 && second.score / top.score >= 0.965 ? second.figure : null
+    second && top.score > 0 && top.score - second.score <= 0.03 ? second.figure : null
 
   const encouragement =
     ENCOURAGEMENTS[

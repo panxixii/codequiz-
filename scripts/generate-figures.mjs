@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { assignIdealPaths, loadQuestions, pathVector } from './lib/quiz-model.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ACCENTS = [
@@ -158,7 +159,22 @@ function normalizeId(id) {
   return id.replace(/\s+/g, '')
 }
 
-function main() {
+function writeIdealPaths(entries) {
+  const lines = [
+    `import type { FigureId } from './figures'`,
+    '',
+    `/**`,
+    ` * 每位人物的理想答题路径：第 i 个字母 = 第 i 题（q01…q10）最符合该人物性格的选项 id。`,
+    ` * 由 scripts/generate-figures.mjs 依人设向量推导生成，请勿手改。`,
+    ` */`,
+    `export const IDEAL_PATHS: Record<FigureId, string> = {`,
+    ...entries.map(([id, name, p]) => `  ${id}: '${p}', // ${name}`),
+    `}`,
+    '',
+  ]
+  fs.writeFileSync(path.join(__dirname, '../src/data/idealPaths.ts'), lines.join('\n'), 'utf8')
+}
+function buildRows() {
   const combined = [...RAW, ...MORE].filter((row) => !PLACEHOLDER_IDS.has(row[0]))
   const seen = new Set()
   const unique = []
@@ -174,7 +190,17 @@ function main() {
     process.exit(1)
   }
 
-  const figures = unique.slice(0, 100)
+  return unique.slice(0, 100)
+}
+function main() {
+  const figures = buildRows()
+  // 人设向量（RAW 第 10 列）→ 理想答题路径 → 人物特质向量 = 理想路径累加的特质（见 .agents/tasks/scoring-design.md）
+  const questions = loadQuestions()
+  const paths = assignIdealPaths(figures.map((row) => row[9]), questions)
+  figures.forEach((row, i) => {
+    row[9] = pathVector(questions, paths[i])
+  })
+  writeIdealPaths(figures.map((row, i) => [row[0], row[1], paths[i]]))
   const traitKeys = [
     'creativity',
     'resilience',
@@ -260,4 +286,4 @@ function main() {
   console.log('Rough poet-related:', poets.length)
 }
 
-main()
+if (process.argv[1] === fileURLToPath(import.meta.url)) main()
