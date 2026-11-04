@@ -50,11 +50,11 @@ function answerJitter(answers: AnswerMap): number {
 }
 
 /**
- * 匹配度：综合三项，映射到约 58–96。
+ * 匹配度：综合三项，经 logistic 曲线连续映射到 0.01–99.99（两位小数）。
  * - 绝对贴合：最高余弦相似度（特质均为正，余弦天然偏高，故用 0.93–0.995 区间拉开）
  * - 相对突出：最高分在全体人物分布中的 z 分数
  * - 领先优势：相对第二名的差距
- * 再叠加 ±2 的答案确定性抖动。
+ * 再叠加小幅答案确定性抖动。
  */
 function computeMatchPercent(sortedScores: number[], answers: AnswerMap): number {
   const [top, second = 0] = sortedScores
@@ -62,13 +62,15 @@ function computeMatchPercent(sortedScores: number[], answers: AnswerMap): number
   const variance = sortedScores.reduce((sum, v) => sum + (v - mean) ** 2, 0) / sortedScores.length
   const z = variance > 0 ? (top - mean) / Math.sqrt(variance) : 0
 
-  const fit = clamp01((top - 0.93) / (0.995 - 0.93))
-  const standout = clamp01((z - 1.2) / (2.4 - 1.2))
+  // fit / standout 不截断上限，让极端契合或极端不契合能进入曲线两端
+  const fit = (top - 0.93) / (0.995 - 0.93)
+  const standout = (z - 1.2) / (2.4 - 1.2)
   const lead = clamp01((top - second) / 0.02)
 
-  const blended = fit * 0.5 + standout * 0.35 + lead * 0.15
-  const raw = 60 + blended * 33 + (answerJitter(answers) - 0.5) * 4
-  return Math.round(Math.min(96, Math.max(58, raw)))
+  const blended = fit * 0.5 + standout * 0.35 + lead * 0.15 + (answerJitter(answers) - 0.5) * 0.06
+  const logistic = 1 / (1 + Math.exp(-(blended - 0.45) * 12))
+  const percent = Math.round(logistic * 10000) / 100
+  return Math.min(99.99, Math.max(0.01, percent))
 }
 
 /** 特质向量余弦相似度匹配；接近时带出第二名「也很像」 */
