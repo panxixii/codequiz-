@@ -1,0 +1,15 @@
+{
+  "name": "codequiz-redeem",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "kv:create": "wrangler kv namespace create REDEEM_USED && wrangler kv namespace create REDEEM_USED --preview"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251104.0",
+    "typescript": "~5.8.3",
+    "wrangler": "^4.45.0"
+  }
+}

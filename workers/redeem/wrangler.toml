@@ -1,0 +1,13 @@
+name = "codequiz-redeem"
+main = "src/index.ts"
+compatibility_date = "2025-11-04"
+
+# ↓↓↓ 第 2 步创建 KV 后，把两个 id 贴到这里 ↓↓↓
+[[kv_namespaces]]
+binding = "REDEEM_USED"
+id = "942f212590944ad2b08d3fb8323b5226"
+preview_id = "e91b2fa371364a5caa6c2e40fd03f149"
+
+# 有效兑换码（逗号分隔，可随时改）
+[vars]
+VALID_CODES = "CODEQUIZ01,CODEQUIZ02,CODEQUIZ03,HISTORY01,MIRROR2026"

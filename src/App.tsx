@@ -1,18 +1,20 @@
 import { useState } from 'react'
 import { StartScreen } from './components/StartScreen'
+import { RedeemScreen } from './components/RedeemScreen'
 import { QuizScreen } from './components/QuizScreen'
 import { ResultScreen } from './components/ResultScreen'
 import { pickRandomBackground } from './data/backgrounds'
 import { QUESTIONS } from './data/questions'
 import { calculateResult, type AnswerMap, type QuizResult } from './lib/score'
 
-type Phase = 'start' | 'quiz' | 'result'
+type Phase = 'start' | 'redeem' | 'quiz' | 'result'
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>('start')
   const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<AnswerMap>({})
   const [result, setResult] = useState<QuizResult | null>(null)
+  const [redeemedCode, setRedeemedCode] = useState<string | null>(null)
   const [backgroundUrl] = useState(() => pickRandomBackground())
 
   function resetAll() {
@@ -20,9 +22,15 @@ export default function App() {
     setStep(0)
     setAnswers({})
     setResult(null)
+    setRedeemedCode(null)
   }
 
   function handleStart() {
+    setPhase('redeem')
+  }
+
+  function handleRedeemSuccess(code: string) {
+    setRedeemedCode(code)
     setPhase('quiz')
     setStep(0)
     setAnswers({})
@@ -31,6 +39,7 @@ export default function App() {
 
   function handleBack() {
     if (step === 0) {
+      // 已核销的码不退回输码页，避免重复消耗；回首页需重新兑码
       setPhase('start')
       return
     }
@@ -59,7 +68,8 @@ export default function App() {
     >
       <main className="app-frame">
         {phase === 'start' ? <StartScreen onStart={handleStart} /> : null}
-        {phase === 'quiz' ? (
+        {phase === 'redeem' ? <RedeemScreen onSuccess={handleRedeemSuccess} /> : null}
+        {phase === 'quiz' && redeemedCode ? (
           <QuizScreen step={step} answers={answers} onAnswer={handleAnswer} onBack={handleBack} />
         ) : null}
         {phase === 'result' && result ? (
