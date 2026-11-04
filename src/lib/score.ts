@@ -35,6 +35,42 @@ function buildUserTraits(answers: AnswerMap): TraitVector {
   return traits
 }
 
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value))
+
+/** 由答案生成稳定的 0–1 抖动，同一组答案结果恒定，不同答案略有差异 */
+function answerJitter(answers: AnswerMap): number {
+  let hash = 2166136261
+  for (const question of QUESTIONS) {
+    const text = `${question.id}:${answers[question.id] ?? ''};`
+    for (let i = 0; i < text.length; i++) {
+      hash = Math.imul(hash ^ text.charCodeAt(i), 16777619)
+    }
+  }
+  return ((hash >>> 0) % 1000) / 999
+}
+
+/**
+ * 匹配度：综合三项，映射到约 58–96。
+ * - 绝对贴合：最高余弦相似度（特质均为正，余弦天然偏高，故用 0.93–0.995 区间拉开）
+ * - 相对突出：最高分在全体人物分布中的 z 分数
+ * - 领先优势：相对第二名的差距
+ * 再叠加 ±2 的答案确定性抖动。
+ */
+function computeMatchPercent(sortedScores: number[], answers: AnswerMap): number {
+  const [top, second = 0] = sortedScores
+  const mean = sortedScores.reduce((sum, v) => sum + v, 0) / sortedScores.length
+  const variance = sortedScores.reduce((sum, v) => sum + (v - mean) ** 2, 0) / sortedScores.length
+  const z = variance > 0 ? (top - mean) / Math.sqrt(variance) : 0
+
+  const fit = clamp01((top - 0.93) / (0.995 - 0.93))
+  const standout = clamp01((z - 1.2) / (2.4 - 1.2))
+  const lead = clamp01((top - second) / 0.02)
+
+  const blended = fit * 0.5 + standout * 0.35 + lead * 0.15
+  const raw = 60 + blended * 33 + (answerJitter(answers) - 0.5) * 4
+  return Math.round(Math.min(96, Math.max(58, raw)))
+}
+
 /** 特质向量余弦相似度匹配；接近时带出第二名「也很像」 */
 export function calculateResult(answers: AnswerMap): QuizResult {
   const userTraits = buildUserTraits(answers)
@@ -50,8 +86,10 @@ export function calculateResult(answers: AnswerMap): QuizResult {
     ranked.map((item) => [item.figure.id, item.score]),
   ) as Record<FigureId, number>
 
-  // 友好策略：把相似度映射到 62–91，避免极端百分比
-  const matchPercent = Math.min(91, Math.max(62, Math.round(top.score * 100 * 0.85 + 18)))
+  const matchPercent = computeMatchPercent(
+    ranked.map((item) => item.score),
+    answers,
+  )
 
   const showSecondary =
     second && top.score > 0 && second.score / top.score >= 0.965 ? second.figure : null
