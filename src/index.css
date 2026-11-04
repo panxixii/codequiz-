@@ -320,24 +320,10 @@ input {
 }
 
 .redeem-caption {
-  margin: 0;
+  margin: 0 0 1.35rem;
   color: #6b5840;
   font-size: 0.88rem;
   letter-spacing: 0.12em;
-}
-
-.redeem-mode {
-  margin: 0.55rem 0 1.2rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-}
-
-.redeem-mode.is-cloud {
-  color: #2f6b3a;
-}
-
-.redeem-mode.is-local {
-  color: var(--seal-deep);
 }
 
 .redeem-field {

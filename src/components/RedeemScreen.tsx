@@ -5,8 +5,6 @@ type RedeemScreenProps = {
   onSuccess: (code: string) => void
 }
 
-const USING_CLOUD = Boolean(import.meta.env.VITE_REDEEM_API)
-
 export function RedeemScreen({ onSuccess }: RedeemScreenProps) {
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -38,9 +36,6 @@ export function RedeemScreen({ onSuccess }: RedeemScreenProps) {
         <h1 className="redeem-title">输入兑换码</h1>
         <p className="cover-line" aria-hidden />
         <p className="redeem-caption">验证通过后即可开始测试</p>
-        <p className={`redeem-mode ${USING_CLOUD ? 'is-cloud' : 'is-local'}`}>
-          {USING_CLOUD ? '核销方式：云端（全网一次）' : '核销方式：本地演示（仅本浏览器）'}
-        </p>
 
         <label className="redeem-field">
           <span className="redeem-label">兑换码</span>
