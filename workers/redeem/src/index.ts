@@ -1,9 +1,16 @@
 export interface Env {
-  /** 已核销兑换码：key = CODE, value = ISO 时间 */
+  /** 使用次数与有效码：uses:CODE / valid:CODE / 旧版 used:CODE */
   REDEEM_USED: KVNamespace
-  /** 可选：逗号分隔有效码；不配则只认 KV 里 status=valid 的码 */
+  /**
+   * 有效码配置，可在 Cloudflare 控制台 Variables 里改。
+   * 格式示例：
+   *   1111:3,2222:5,3333
+   * 含义：
+   *   1111 最多用 3 次
+   *   2222 最多用 5 次
+   *   3333 未写次数 = 默认 1 次
+   */
   VALID_CODES?: string
-  /** 可选：管理接口密钥，用于批量导入有效码 */
   ADMIN_TOKEN?: string
 }
 
@@ -11,6 +18,11 @@ type JsonBody = {
   code?: string
   codes?: string[]
   token?: string
+}
+
+type CodeRule = {
+  code: string
+  limit: number
 }
 
 function json(data: unknown, init: ResponseInit = {}): Response {
@@ -26,23 +38,58 @@ function normalizeCode(raw: string): string {
   return raw.trim().toUpperCase().replace(/\s+/g, '')
 }
 
-function parseValidCodes(env: Env): Set<string> {
+/** 解析 VALID_CODES：支持 1111 / 1111:3 / 中英文逗号、空格、换行 */
+function parseCodeRules(env: Env): Map<string, number> {
   const raw = env.VALID_CODES?.trim()
-  if (!raw) return new Set()
-  return new Set(
-    raw
-      .split(/[,，\s]+/)
-      .map((item) => normalizeCode(item))
-      .filter(Boolean),
-  )
+  const map = new Map<string, number>()
+  if (!raw) return map
+
+  for (const part of raw.split(/[,，\n]+/)) {
+    const token = part.trim()
+    if (!token) continue
+
+    // 允许 "1111:3" 或 "1111：3"
+    const matched = /^(.+?)[:：]\s*(\d+)\s*$/.exec(token)
+    if (matched) {
+      const code = normalizeCode(matched[1])
+      const limit = Math.max(1, Number.parseInt(matched[2], 10) || 1)
+      if (code) map.set(code, limit)
+      continue
+    }
+
+    const code = normalizeCode(token)
+    if (code) map.set(code, 1)
+  }
+
+  return map
 }
 
-async function isCodeValid(env: Env, code: string): Promise<boolean> {
-  const listed = parseValidCodes(env)
-  if (listed.size > 0) return listed.has(code)
+async function resolveRule(env: Env, code: string): Promise<CodeRule | null> {
+  const rules = parseCodeRules(env)
+  if (rules.size > 0) {
+    const limit = rules.get(code)
+    if (!limit) return null
+    return { code, limit }
+  }
 
+  // 未配 VALID_CODES 时，认 KV 里的 valid:CODE（可选带次数 valid:CODE = "5"）
   const record = await env.REDEEM_USED.get(`valid:${code}`)
-  return record === '1'
+  if (!record) return null
+  const limit = Math.max(1, Number.parseInt(record, 10) || 1)
+  return { code, limit }
+}
+
+async function getUsedCount(env: Env, code: string): Promise<number> {
+  const usesRaw = await env.REDEEM_USED.get(`uses:${code}`)
+  if (usesRaw != null) {
+    return Math.max(0, Number.parseInt(usesRaw, 10) || 0)
+  }
+
+  // 兼容旧版：used:CODE 表示已用完 1 次额度
+  const legacy = await env.REDEEM_USED.get(`used:${code}`)
+  if (legacy) return 1
+
+  return 0
 }
 
 async function redeem(env: Env, rawCode: string): Promise<Response> {
@@ -51,21 +98,34 @@ async function redeem(env: Env, rawCode: string): Promise<Response> {
     return json({ ok: false, message: '请输入兑换码' }, { status: 400 })
   }
 
-  const valid = await isCodeValid(env, code)
-  if (!valid) {
+  const rule = await resolveRule(env, code)
+  if (!rule) {
     return json({ ok: false, message: '兑换码不正确' }, { status: 400 })
   }
 
-  const usedKey = `used:${code}`
-  const already = await env.REDEEM_USED.get(usedKey)
-  if (already) {
-    return json({ ok: false, message: '该兑换码已使用' }, { status: 409 })
+  const used = await getUsedCount(env, code)
+  if (used >= rule.limit) {
+    return json(
+      {
+        ok: false,
+        message: rule.limit <= 1 ? '该兑换码已使用' : '该兑换码次数已用完',
+        used,
+        limit: rule.limit,
+      },
+      { status: 409 },
+    )
   }
 
-  // KV 无强一致事务；常规流量下「先读后写」足够。高并发可再换 Durable Object。
-  await env.REDEEM_USED.put(usedKey, new Date().toISOString())
+  const next = used + 1
+  await env.REDEEM_USED.put(`uses:${code}`, String(next))
 
-  return json({ ok: true, code })
+  return json({
+    ok: true,
+    code,
+    used: next,
+    limit: rule.limit,
+    remaining: Math.max(0, rule.limit - next),
+  })
 }
 
 async function importCodes(env: Env, body: JsonBody): Promise<Response> {
@@ -81,6 +141,7 @@ async function importCodes(env: Env, body: JsonBody): Promise<Response> {
     return json({ ok: false, message: 'codes 不能为空' }, { status: 400 })
   }
 
+  // 导入时默认 1 次；若要多次，请直接在 VALID_CODES 用 码:次数
   await Promise.all(codes.map((code) => env.REDEEM_USED.put(`valid:${code}`, '1')))
   return json({ ok: true, imported: codes.length })
 }
@@ -112,7 +173,6 @@ export default {
       return importCodes(env, body)
     }
 
-    // 默认核销：POST / 或 POST /redeem
     if (url.pathname === '/' || url.pathname === '/redeem') {
       return redeem(env, body.code ?? '')
     }
