@@ -236,6 +236,23 @@ npx wrangler deploy
 **Q：CORS 报错？**  
 Worker 已允许跨域；确认你请求的是 `/redeem` 完整 URL，且是 `POST` + JSON。
 
+**Q：不用 VPN 时一直「校验中」，最后提示网络异常？**  
+这是正常现象：`*.workers.dev` 在国内经常被拦截，挂 VPN 才能通。  
+解决办法：给 Worker **绑定你自己的域名**（不要继续用 workers.dev），然后把前端的 `VITE_REDEEM_API` 改成新地址并重新构建/发布。
+
+### 绑定自定义域名（推荐）
+
+1. 准备一个域名，把 DNS 托管到 Cloudflare（Nameserver 指到 CF）。
+2. 打开 https://dash.cloudflare.com/ → **Workers & Pages** → `codequiz-redeem`
+3. **Settings** → **Domains & Routes** → **Add** → **Custom Domain**
+4. 填例如 `redeem.你的域名.com` → 保存（CF 会自动加 DNS + 证书）
+5. 等几分钟后，用无 VPN 访问：
+   `https://redeem.你的域名.com/health`  
+   应返回 JSON（含 `ok: true`）
+6. 改本地 `.env.local` 和 GitHub Secret `VITE_REDEEM_API` 为：
+   `https://redeem.你的域名.com/redeem`
+7. 推送/重新跑 Pages 构建，让线上前端用新地址
+
 **Q：码在本地测过，线上还能用吗？**  
 本地 KV 和线上 KV 是分开的。本地测过的码，线上仍可再用一次（除非你也在线上测过）。
 

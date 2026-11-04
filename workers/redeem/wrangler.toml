@@ -1,6 +1,14 @@
 name = "codequiz-redeem"
 main = "src/index.ts"
 compatibility_date = "2025-11-04"
+workers_dev = true
+
+# 国内可访问
+# 管理台：https://redeem.xixi-cici.cn/admin
+# 核销接口：https://redeem.xixi-cici.cn/redeem
+[[routes]]
+pattern = "redeem.xixi-cici.cn"
+custom_domain = true
 
 # ↓↓↓ 第 2 步创建 KV 后，把两个 id 贴到这里 ↓↓↓
 [[kv_namespaces]]
